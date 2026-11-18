@@ -20,6 +20,9 @@
 | 0.25.0 | Removed upstream files nothing in this fork uses: `.woodpecker/` (upstream's Codeberg Woodpecker CI; GitHub Actions runs CI here) and `faer-ffi/main.cpp` (an unreferenced C++ example). When an upstream sync modifies them, resolve the modify/delete conflict by keeping the deletion (`git rm`). | `/repo:all` hygiene pass, 2026-10-07 |
 | 0.25.0 | `faer/Cargo.toml` requires `private-gemm-x86 = "0.1.22"` (upstream: `"0.1.20"`): every 0.1.x release up to 0.1.20 is yanked on crates.io and 0.1.21 does not exist. When an upstream sync touches this line, keep `0.1.22` (or the higher of the two), or `Cargo.lock` resolves a yanked version again. | rjwalters/faier#19 |
 | 0.25.0 | **Breaking public API change.** Sparse LU takes a user-supplied fill-reducing column ordering: `faer::sparse::linalg::lu::factorize_symbolic_lu(A, ord, params)` gains a positional `ord: LuColOrdering` argument, with `LuColOrdering::{Colamd (default, the previous hardcoded behaviour), Identity, Custom(&[I])}`. `Custom(order)` is the elimination order in **new → old** orientation (`order[k]` is the original column eliminated at step `k`, i.e. the forward column permutation `SymbolicLu::col_perm()` returns); the inverse is built internally, and a wrong-length, out-of-range or duplicate order panics with a clear message. Also **breaking**: `faer::sparse::linalg::qr::column_counts_ata` now takes `A: SymbolicSparseRowMatRef` instead of `AT: SymbolicSparseColMatRef` (pass `A` row-major, no longer `A.transpose()`), and its doc now says the etree is of $A^\top A$ (was $A A^\top$). Operator decision (rjwalters/faier#26): keep the break, so the next `faier` release is **0.25.0**, deliberately departing from the "track upstream's minor" rule in [Versioning](#versioning) for this release. Upstream sync note: upstream callers of the two functions need the new arguments. Tests: `tests/fork_lu_col_ordering.rs` (`every_lu_col_ordering_solves_on_simplicial_and_supernodal_paths`, `default_lu_col_ordering_is_colamd`, `custom_lu_col_ordering_rejects_{duplicate,wrong_length,out_of_range}`) and `test_solver_lu_custom_col_ordering` (unit, `faer/src/sparse/linalg/lu.rs`). | codeberg [sarah-quinones/faer#307](https://codeberg.org/sarah-quinones/faer/issues/307) |
+| unreleased | `MatMut::from_row_major_slice_with_stride_mut` now passes `(row_stride, 1)` to the matrix view. Reads and writes address the intended elements of a padded row-major slice. Test `codeberg_305` checks the view and its backing slice after a write. Backported from `530e1f0`, `8848d40`, `c6932ba` and `8910319`. | upstream [#305](https://codeberg.org/sarah-quinones/faer/issues/305) |
+| unreleased | BiCGSTAB initializes its residual from the right-hand side when `initial_guess` is `Zero`. The upstream `bicgstab::tests::codeberg_326` regression checks the solution with three different initial scratch-buffer fills. Backported from `3ba6008` and `cb792ef`. | upstream [#326](https://codeberg.org/sarah-quinones/faer/issues/326) |
+| unreleased | Conjugate gradient initializes its residual from the right-hand side when `initial_guess` is `Zero`. The upstream `conjugate_gradient::tests::codeberg_326` regression checks the solution with three different initial scratch-buffer fills. Backported from `0aace20` and `0ecd846`. | upstream [#326](https://codeberg.org/sarah-quinones/faer/issues/326) |
 
 ## Upstream base
 
@@ -37,13 +40,14 @@ How to bring a new upstream release (`faer-vX.Y.Z`) into `faier` without losing 
 
 ### Fork regression tests
 
-Every fork change has a test: integration tests named `faer/tests/fork_*.rs`, plus two unit modules inside the crate. To run only those, from the repository root:
+Run the fork integration tests and selected unit regressions from the repository root.
 
 ```sh
-cargo test -p faier --test 'fork_*' && cargo test -p faier --lib -- make_givens_tests aed_window_spin_tests
+cargo test -p faier --test 'fork_*'
+cargo test -p faier --lib -- make_givens_tests aed_window_spin_tests codeberg_305 codeberg_326
 ```
 
-The first command runs every `fork_*` integration test (cargo expands the glob). The second runs the unit modules `make_givens_tests` (`faer/src/linalg/gevd/gen_hessenberg/mod.rs`) and `qz_cplx::aed_window_spin_tests` (`faer/src/linalg/gevd/qz_cplx/mod.rs`). The second command should report 3 passed; check this, because a test filter that matches nothing still passes.
+The unit command should report six tests passed. Three cover Givens rotations and QZ deflation. The other three are upstream's padded row-major view test (`codeberg_305`) and the zero-initial-guess test for each solver (`codeberg_326`).
 
 ### Procedure
 
