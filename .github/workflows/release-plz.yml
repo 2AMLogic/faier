@@ -7,9 +7,10 @@
 #   (`release_always = false` in release-plz.toml).
 #
 # Publishing uses crates.io Trusted Publishing (GitHub OIDC, `id-token: write`);
-# there is no registry token secret. Both jobs are disabled until the operator
-# sets the repository variable RELEASE_PLZ_ENABLED to `true`, so merging this
-# file cannot publish anything. crates.io trusted publishers are bound to this
+# there is no registry token secret. Both jobs require RELEASE_PLZ_ENABLED to
+# be `true` (already enabled here). Before landing owner-guard changes, crate
+# maintainers must verify both Trusted Publishing identities in FORK.md.
+# A merged release PR can publish on the next main push. Publishers bind this
 # filename: renaming the file breaks publishing until the publisher is updated.
 name: Release-plz
 
@@ -24,7 +25,7 @@ permissions:
 jobs:
   release-plz-release:
     name: Release-plz release
-    if: ${{ vars.RELEASE_PLZ_ENABLED == 'true' && github.repository == 'rjwalters/faier' }}
+    if: ${{ vars.RELEASE_PLZ_ENABLED == 'true' && github.repository == '2AMLogic/faier' }}
     runs-on: ubuntu-latest
     permissions:
       # Push tags and create GitHub Releases.
@@ -56,7 +57,7 @@ jobs:
 
   release-plz-pr:
     name: Release-plz PR
-    if: ${{ vars.RELEASE_PLZ_ENABLED == 'true' && github.repository == 'rjwalters/faier' }}
+    if: ${{ vars.RELEASE_PLZ_ENABLED == 'true' && github.repository == '2AMLogic/faier' }}
     runs-on: ubuntu-latest
     permissions:
       # Push the release PR branch.

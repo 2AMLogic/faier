@@ -147,7 +147,7 @@ The tags cannot collide with upstream's (`faer-v*`, `faer-traits-v*`, `faer-macr
 
 ### How a release happens
 
-The workflow is `.github/workflows/release-plz.yml`. Both jobs are skipped unless the repository variable `RELEASE_PLZ_ENABLED` is `true` (see the checklist below).
+The workflow is `.github/workflows/release-plz.yml` in `2AMLogic/faier`. Both jobs require that exact repository and the repository variable `RELEASE_PLZ_ENABLED` to be `true` (see the checklist below).
 
 1. **Release PR.** On every push to `main`, the `release-plz-pr` job opens or updates a PR from a `release-plz-*` branch. The PR bumps the versions in `faer/Cargo.toml` / `faer-traits/Cargo.toml` (and `Cargo.lock`) and adds the new commits to the package changelogs. It only covers packages whose packaged files changed since the version on crates.io (`cargo package --list -p <name>` shows those files).
 2. **Review it like any PR.** Check the proposed version against the rule above and edit the changelog (it lists every commit that touched the package, including upstream's commits after a sync; trim it to what users need). cargo-semver-checks is off for `faier` (see `release-plz.toml`), so also check the public API by hand: `git diff v<last faier version> -- faer/src` must not change or remove any public item unless the release is a minor bump. A breaking change that wasn't marked `feat!:` or `BREAKING CHANGE:` would otherwise ship as a patch.
@@ -161,9 +161,11 @@ The workflow is `.github/workflows/release-plz.yml`. Both jobs are skipped unles
 
 ### Operator checklist
 
-The repository's automation never publishes, tags or changes settings; these steps are the operator's. crates.io publishes are permanent (a version can be yanked, never replaced or deleted).
+The operator owns the publishing setup and settings below. The enabled workflow publishes through reviewed release PRs as described above. crates.io publishes are permanent (a version can be yanked, never replaced or deleted).
 
 **Status: completed 2026-10-07/08.** `faier-traits` 0.24.0 and `faier` 0.25.0 were published by hand from `3222f12` (tags `faier-traits-v0.24.0`, `v0.25.0`). The publish token was revoked afterwards, trusted publishers were added on both crates, and `RELEASE_PLZ_ENABLED` is `true`. The first automated release, `faier` 0.25.1 and `faier-traits` 0.24.1 from release PR #37, was published through Trusted Publishing. The steps below are kept as a record and in case the setup ever has to be redone (e.g. a new crate).
+
+**Organization transfer (2026-11-18): verification pending.** The current repository is `2AMLogic/faier`; the original Trusted Publishing setup used owner `rjwalters`. Before landing the repaired workflow guards, a crate maintainer must verify the existing entry for **each** of `faier` and `faier-traits`: owner `2AMLogic`, repository `faier`, workflow filename `release-plz.yml`, and no environment. Record confirmation for both crates on #48 without credentials. Repository redirects and the historical successful releases do not confirm the current publishing identity. Keep the source PR draft until that receipt exists; do not rerun the initial-publish commands or toggle the already-enabled variable to test the migration. After landing, record the next ordinary eligible release run separately.
 
 **(a) crates.io ownership.** Log in to crates.io with the GitHub account that will own the crates (`rjwalters`) and verify the email address (crates.io requires a verified email to publish). Check that `faier` and `faier-traits` are still unclaimed: `https://crates.io/api/v1/crates/faier` should return 404.
 
@@ -173,11 +175,13 @@ The repository's automation never publishes, tags or changes settings; these ste
 2. On a clean checkout of `main` that contains this release setup (with `faer/Cargo.toml` at `0.25.0`), run the dry run above, then `cargo login` (paste the token at the prompt, not on the command line) and `cargo publish -p faier-traits -p faier`. Cargo publishes `faier-traits` first and waits for it to appear in the index before publishing `faier`. With cargo older than 1.90, run `cargo publish -p faier-traits`, then `cargo publish -p faier`.
 3. Run `cargo logout` and revoke the token on <https://crates.io/settings/tokens>.
 
-**(c) Add the trusted publishers.** For each crate: crates.io → the crate → Settings → Trusted Publishing → Add → GitHub, with repository owner `rjwalters`, repository name `faier`, workflow filename `release-plz.yml`, and no environment. If you add a GitHub environment as an extra gate, enter its name here and add `environment: <name>` to the `release-plz-release` job.
+**(c) Verify or add the trusted publishers.** For each crate: crates.io → the crate → Settings → Trusted Publishing → GitHub, with repository owner `2AMLogic`, repository name `faier`, workflow filename `release-plz.yml`, and no environment. Check the existing entries for both published crates; use Add for a new crate. If you add a GitHub environment as an extra gate, enter its name here and add `environment: <name>` to the `release-plz-release` job.
 
 **(d) Allow the release PR.** GitHub → Settings → Actions → General → Workflow permissions: tick "Allow GitHub Actions to create and approve pull requests" (enabled on this repository on 2026-10-07; default workflow token permissions stay read-only). Without it the `release-plz-pr` job cannot open the release PR.
 
 **(e) Tag the hand-published versions and enable the workflow.**
+
+Historical initial-setup commands (October 2026, before the repository transfer):
 
 ```sh
 SHA=<commit the crates were published from>
